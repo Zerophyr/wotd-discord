@@ -7,6 +7,7 @@ import {
   type DictionarySense,
   type DictionaryTranslation,
 } from "./dictionary-types.js";
+import { analyzePonsFragment } from "./pons-markup.js";
 
 const PONS_ENDPOINT = "https://api.pons.com/v1/dictionary";
 const MAX_ENTRIES_PER_DIRECTION = 20;
@@ -165,18 +166,13 @@ function parseEntry(entry: Record<string, unknown>): DictionaryEntry[] {
     parsed.push({
       headword: rom.headword,
       headwordFull,
-      pronunciation: extractPronunciation(headwordFull),
+      pronunciation: analyzePonsFragment(headwordFull).pronunciation,
       wordClass: typeof rom.wordclass === "string" ? rom.wordclass : null,
       senses,
     });
   }
 
   return parsed;
-}
-
-export function extractPronunciation(headwordFull: string): string | null {
-  const withoutTags = headwordFull.replace(/<[^>]*>/g, "");
-  return withoutTags.match(/\[[^\]\r\n]{1,100}\]/u)?.[0] ?? null;
 }
 
 function parseTranslation(value: Record<string, unknown>): DictionaryTranslation | null {

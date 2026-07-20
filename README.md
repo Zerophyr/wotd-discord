@@ -93,6 +93,8 @@ Automatic direction can show German→English and English→German results when 
 
 For ambiguous words, the concise result is spread across distinct meanings instead of showing several examples from only the first meaning. Pronunciation is included whenever PONS provides it.
 
+PONS grammar, regional, usage, and subject labels are separated from the word and expanded where possible—for example, `American English`, `dated`, and `computing` instead of `Am` or `COMPUT` running into the entry text.
+
 Each member can submit one lookup every 10 seconds. If they retry too soon, the bot shows the remaining wait time privately and asks them to retry.
 
 Only words requested by users are sent to PONS. Successful normalized results are retained in SQLite indefinitely and reused across restarts. A failed no-result lookup is cached for 24 hours. PONS currently advertises a free allowance of 1,000 reference queries per month; cached lookups do not consume another query.

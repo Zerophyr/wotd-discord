@@ -94,6 +94,46 @@ describe("dictionary embeds", () => {
     assert.equal((field?.value.match(/→/g) ?? []).length, 3);
   });
 
+  it("separates and expands PONS grammar, usage, and subject labels", () => {
+    const auto: DictionaryResult = {
+      schemaVersion: 2,
+      provider: "pons",
+      query: "auto",
+      fetchedAt: "2026-07-20T10:00:00.000Z",
+      directions: [{
+        sourceLanguage: "en",
+        targetLanguage: "de",
+        entries: [{
+          headword: "auto",
+          headwordFull: `auto
+            <span class="phonetics">[ˈɔ:təʊ, <span class="region"><acronym title="American English">Am</acronym></span> ˈɑ:t̬oʊ]</span>
+            <span class="wordclass"><acronym title="noun">N</acronym></span>
+            <span class="region"><acronym title="American English">Am</acronym></span>
+            <span class="age">dated</span>`,
+          pronunciation: "[ˈɔ:təʊ, Am ˈɑ:t̬oʊ]",
+          wordClass: "noun",
+          senses: [{
+            label: null,
+            translations: [{
+              source: `<span class="full_collocation"><strong class="tilde">auto</strong> store</span>
+                <span class="topic"><acronym title="computing">COMPUT</acronym></span>`,
+              target: `Auto <span class="genus"><acronym title="neuter">nt</acronym></span>
+                <span class="flexion">&lt;-s, -s&gt;</span>`,
+            }],
+          }],
+        }],
+      }],
+    };
+
+    const field = createDictionaryEmbeds(auto, "en-de")[0]?.toJSON().fields?.[0];
+    assert.match(field?.name ?? "", /auto.*pleɪn|auto.*ɔ:təʊ/);
+    assert.match(field?.name ?? "", /noun · American English · dated/);
+    assert.doesNotMatch(field?.name ?? "", /auto N Am/);
+    assert.match(field?.value ?? "", /auto store \*\(computing\)\*/);
+    assert.doesNotMatch(field?.value ?? "", /store COMPUT/);
+    assert.match(field?.value ?? "", /\*\*Auto\*\* \*\(neuter;/);
+  });
+
   it("filters an explicit direction", () => {
     const embeds = createDictionaryEmbeds(result, "en-de").map((embed) => embed.toJSON());
     assert.equal(embeds.length, 1);

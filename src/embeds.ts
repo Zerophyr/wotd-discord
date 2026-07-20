@@ -1,5 +1,6 @@
 import { EmbedBuilder } from "discord.js";
 import type { DictionaryEntry, DictionaryResult, DictionaryTranslation, LookupDirection } from "./dictionary-types.js";
+import { analyzePonsFragment } from "./pons-markup.js";
 import type { Word } from "./types.js";
 
 const categoryLabels: Record<Word["category"], string> = {
@@ -66,8 +67,10 @@ export function createDictionaryEmbeds(result: DictionaryResult, direction: Look
 
       for (const entry of item.entries.slice(0, 3)) {
         const lines = selectSenseTranslations(entry).map(({ label, translation }) => {
-          const senseLabel = label ? `${plainText(label)} ` : "";
-          return `${senseLabel}${plainText(translation.source)} → **${plainText(translation.target)}**`;
+          const senseLabel = label ? `${formatPonsFragment(label)} ` : "";
+          const source = formatPonsFragment(translation.source);
+          const target = formatPonsFragmentParts(translation.target);
+          return `${senseLabel}${source} → **${target.text}**${target.annotationSuffix}`;
         });
         embed.addFields({
           name: dictionaryEntryHeading(entry),
@@ -98,16 +101,46 @@ function selectSenseTranslations(entry: DictionaryEntry, limit = 3): Array<{
 }
 
 function dictionaryEntryHeading(entry: DictionaryEntry): string {
-  const fullHeadword = plainText(entry.headwordFull || entry.headword);
-  const pronunciation = entry.pronunciation ? plainText(entry.pronunciation) : "";
-  const wordClass = entry.wordClass ? ` · ${plainText(entry.wordClass)}` : "";
-  if (!pronunciation) return truncate(`${fullHeadword}${wordClass}`, DICTIONARY_FIELD_NAME_LIMIT);
-
-  const headwordWithoutPronunciation = fullHeadword.replace(pronunciation, "").replace(/\s+/g, " ").trim();
-  let suffix = ` ${pronunciation}${wordClass}`;
-  if (suffix.length >= DICTIONARY_FIELD_NAME_LIMIT) suffix = ` ${pronunciation}`;
+  const fragment = analyzePonsFragment(entry.headwordFull || entry.headword);
+  const headword = plainText(fragment.text) || plainText(entry.headword);
+  const pronunciation = entry.pronunciation ?? fragment.pronunciation;
+  const safePronunciation = pronunciation ? plainText(pronunciation) : "";
+  const annotations = uniqueAnnotations([
+    entry.wordClass ?? "",
+    ...fragment.annotations,
+  ]).map(plainText);
+  const annotationSuffix = annotations.length > 0 ? ` — ${annotations.join(" · ")}` : "";
+  let suffix = `${safePronunciation ? ` ${safePronunciation}` : ""}${annotationSuffix}`;
+  if (suffix.length >= DICTIONARY_FIELD_NAME_LIMIT) {
+    suffix = safePronunciation ? ` ${safePronunciation}` : truncate(annotationSuffix, DICTIONARY_FIELD_NAME_LIMIT - 1);
+  }
   const prefixLimit = Math.max(1, DICTIONARY_FIELD_NAME_LIMIT - suffix.length);
-  return `${truncate(headwordWithoutPronunciation, prefixLimit)}${suffix}`;
+  return `${truncate(headword, prefixLimit)}${suffix}`;
+}
+
+function formatPonsFragment(input: string): string {
+  const fragment = formatPonsFragmentParts(input);
+  return `${fragment.text}${fragment.annotationSuffix}`;
+}
+
+function formatPonsFragmentParts(input: string): { text: string; annotationSuffix: string } {
+  const fragment = analyzePonsFragment(input);
+  const text = plainText(fragment.text);
+  const annotations = uniqueAnnotations(fragment.annotations).map(plainText);
+  return {
+    text,
+    annotationSuffix: annotations.length > 0 ? ` *(${annotations.join("; ")})*` : "",
+  };
+}
+
+function uniqueAnnotations(values: string[]): string[] {
+  const seen = new Set<string>();
+  return values.filter((value) => {
+    const normalized = plainText(value).toLocaleLowerCase("en");
+    if (!normalized || seen.has(normalized)) return false;
+    seen.add(normalized);
+    return true;
+  });
 }
 
 export function plainText(input: string): string {
