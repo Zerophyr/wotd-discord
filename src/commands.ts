@@ -39,6 +39,17 @@ export const commandBuilders = [
     )
     .addSubcommand((subcommand) =>
       subcommand.setName("status").setDescription("Show today's status and words remaining"),
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName("reset")
+        .setDescription("Reset all Word-of-the-Day posting history")
+        .addBooleanOption((option) =>
+          option
+            .setName("confirm")
+            .setDescription("Confirm that every posted word should become available again")
+            .setRequired(true),
+        ),
     ),
 ];
 

@@ -92,6 +92,11 @@ export class WordDatabase {
       CREATE INDEX IF NOT EXISTS idx_words_category ON words(category, active);
       CREATE INDEX IF NOT EXISTS idx_history_local_date ON post_history(local_date);
 
+      CREATE TABLE IF NOT EXISTS wotd_state (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+
       CREATE TABLE IF NOT EXISTS dictionary_cache (
         normalized_query TEXT PRIMARY KEY,
         display_query TEXT NOT NULL,
@@ -181,10 +186,35 @@ export class WordDatabase {
   }
 
   recordPost(wordId: number, channelId: string, localDate: string, postedAt = new Date().toISOString()): void {
-    this.#db.prepare(`
-      INSERT INTO post_history (word_id, channel_id, local_date, posted_at)
-      VALUES (?, ?, ?, ?)
-    `).run(wordId, channelId, localDate, postedAt);
+    this.#db.transaction(() => {
+      this.#db.prepare(`
+        INSERT INTO post_history (word_id, channel_id, local_date, posted_at)
+        VALUES (?, ?, ?, ?)
+      `).run(wordId, channelId, localDate, postedAt);
+      this.#db.prepare(`
+        DELETE FROM wotd_state
+        WHERE key = 'automatic_post_suppressed_date' AND value = ?
+      `).run(localDate);
+    })();
+  }
+
+  resetWotdHistory(suppressAutomaticPostingForDate: string): number {
+    return this.#db.transaction(() => {
+      const deleted = this.#db.prepare("DELETE FROM post_history").run().changes;
+      this.#db.prepare(`
+        INSERT INTO wotd_state (key, value)
+        VALUES ('automatic_post_suppressed_date', ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value
+      `).run(suppressAutomaticPostingForDate);
+      return deleted;
+    })();
+  }
+
+  isAutomaticPostingSuppressed(localDate: string): boolean {
+    const row = this.#db.prepare(`
+      SELECT value FROM wotd_state WHERE key = 'automatic_post_suppressed_date'
+    `).get() as { value: string } | undefined;
+    return row?.value === localDate;
   }
 
   hasPostForDate(channelId: string, localDate: string): boolean {

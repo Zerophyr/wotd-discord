@@ -10,6 +10,7 @@ A small Discord bot that automatically posts a curated German word every day. It
 - Private PONS-backed `/word` German↔English lookup in every permitted channel
 - On-demand SQLite dictionary cache so repeated lookups do not consume API quota
 - `/wotd preview`, `/wotd post`, and `/wotd status` for members with **Manage Server**
+- Confirmed `/wotd reset` for restarting the posting rotation without clearing dictionary cache
 - 70 curated entries: ten words in each weekday category
 - Docker deployment with persistent database storage
 
@@ -98,6 +99,10 @@ PONS grammar, regional, usage, and subject labels are separated from the word an
 Each member can submit one lookup every 10 seconds. If they retry too soon, the bot shows the remaining wait time privately and asks them to retry.
 
 Only words requested by users are sent to PONS. Successful normalized results are retained in SQLite indefinitely and reused across restarts. A failed no-result lookup is cached for 24 hours. PONS currently advertises a free allowance of 1,000 reference queries per month; cached lookups do not consume another query.
+
+## Resetting the Word-of-the-Day rotation
+
+Members with **Manage Server** can run `/wotd reset confirm:True` to make every curated word available again. This deletes only posting history; vocabulary and PONS lookup cache remain intact. Automatic posting is paused for the rest of that local calendar day to prevent an immediate repost. The next scheduled post restarts the rotation, or `/wotd post` can start it immediately.
 
 ## Vocabulary and posting behavior
 

@@ -55,6 +55,27 @@ describe("WordDatabase", () => {
     assert.equal(database.remainingCount(), 69);
   });
 
+  it("resets only WOTD history and suppresses automatic posting for that day", () => {
+    database = new WordDatabase(":memory:");
+    const first = database.getNextWord("everyday");
+    assert.ok(first);
+    database.recordPost(first.id, "channel-1", "2026-07-20", "2026-07-20T08:00:00.000Z");
+    database.putDictionaryMiss("missing", "missing", new Date("2026-07-20T08:00:00.000Z"));
+
+    assert.equal(database.resetWotdHistory("2026-07-20"), 1);
+    assert.equal(database.remainingCount(), 70);
+    assert.equal(database.hasPostForDate("channel-1", "2026-07-20"), false);
+    assert.equal(database.isAutomaticPostingSuppressed("2026-07-20"), true);
+    assert.equal(database.isAutomaticPostingSuppressed("2026-07-21"), false);
+    assert.deepEqual(
+      database.getDictionaryCache("missing", new Date("2026-07-20T08:01:00.000Z")),
+      { status: "not_found" },
+    );
+
+    database.recordPost(first.id, "channel-1", "2026-07-20", "2026-07-20T08:05:00.000Z");
+    assert.equal(database.isAutomaticPostingSuppressed("2026-07-20"), false);
+  });
+
   it("discards outdated and corrupt cached dictionary JSON", () => {
     const directory = mkdtempSync(join(tmpdir(), "wotd-database-test-"));
     const path = join(directory, "test.sqlite");

@@ -129,7 +129,7 @@ export function isSingleWordQuery(value: string): boolean {
   return /^(?=.*\p{L})[\p{L}\p{N}]+(?:[-'’][\p{L}\p{N}]+)*$/u.test(value);
 }
 
-async function handleWotd(
+export async function handleWotd(
   interaction: ChatInputCommandInteraction,
   config: Config,
   database: WordDatabase,
@@ -141,6 +141,25 @@ async function handleWotd(
   }
 
   const subcommand = interaction.options.getSubcommand();
+
+  if (subcommand === "reset") {
+    const confirmed = interaction.options.getBoolean("confirm", true);
+    if (!confirmed) {
+      await interaction.reply({
+        content: "Reset cancelled. No Word-of-the-Day history was changed.",
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
+    const local = getLocalTime(new Date(), config.timezone);
+    const resetCount = database.resetWotdHistory(local.date);
+    await interaction.reply({
+      content: `Reset complete. Removed **${resetCount}** posting-history ${resetCount === 1 ? "entry" : "entries"}; all **${database.remainingCount()}** curated words are available again. Automatic posting is paused for today; the next scheduled post starts the rotation again. Use \`/wotd post\` to post immediately instead.`,
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
 
   if (subcommand === "preview") {
     const word = posts.preview();
@@ -168,8 +187,11 @@ async function handleWotd(
   const local = getLocalTime(new Date(), config.timezone);
   const posted = database.getPostForDate(config.channelId, local.date);
   const status = posted ? `Posted today: **${posted.word.word}**` : "Nothing has been posted today yet.";
+  const paused = database.isAutomaticPostingSuppressed(local.date)
+    ? "\nAutomatic posting: **paused for today after reset**"
+    : "";
   await interaction.reply({
-    content: `${status}\nSchedule: **${config.postTime} ${config.timezone}**\nUnused words: **${database.remainingCount()} / ${database.totalCount()}**`,
+    content: `${status}${paused}\nSchedule: **${config.postTime} ${config.timezone}**\nUnused words: **${database.remainingCount()} / ${database.totalCount()}**`,
     flags: MessageFlags.Ephemeral,
   });
 }

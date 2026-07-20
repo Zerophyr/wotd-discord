@@ -32,6 +32,7 @@ export class DailyScheduler {
 
     try {
       const local = getLocalTime(now, this.config.timezone);
+      if (this.database.isAutomaticPostingSuppressed(local.date)) return;
       const postedToday = this.database.hasPostForDate(this.config.channelId, local.date);
       if (!shouldPost(local, this.config.postTime, postedToday)) return;
 
