@@ -4,6 +4,7 @@ export interface Config {
   discordToken: string;
   discordClientId: string;
   discordGuildId: string | undefined;
+  ponsApiSecret: string;
   channelId: string;
   postTime: string;
   timezone: string;
@@ -37,6 +38,7 @@ export function loadConfig(): Config {
     discordToken: required("DISCORD_TOKEN"),
     discordClientId: required("DISCORD_CLIENT_ID"),
     discordGuildId: process.env.DISCORD_GUILD_ID?.trim() || undefined,
+    ponsApiSecret: required("PONS_API_SECRET"),
     channelId: required("WOTD_CHANNEL_ID"),
     postTime: validateTime(process.env.WOTD_POST_TIME?.trim() || "10:00"),
     timezone: validateTimezone(process.env.WOTD_TIMEZONE?.trim() || "Europe/Berlin"),

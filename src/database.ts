@@ -1,6 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import Database from "better-sqlite3";
+import { isDictionaryResult, type DictionaryResult } from "./dictionary-types.js";
 import { seedWords } from "./seed-words.js";
 import type { SeedWord, Word, WordCategory } from "./types.js";
 
@@ -24,6 +25,10 @@ export interface PostRecord {
   channelId: string;
   word: Word;
 }
+
+export type DictionaryCacheRecord =
+  | { status: "found"; result: DictionaryResult }
+  | { status: "not_found" };
 
 function mapWord(row: WordRow): Word {
   return {
@@ -86,6 +91,21 @@ export class WordDatabase {
 
       CREATE INDEX IF NOT EXISTS idx_words_category ON words(category, active);
       CREATE INDEX IF NOT EXISTS idx_history_local_date ON post_history(local_date);
+
+      CREATE TABLE IF NOT EXISTS dictionary_cache (
+        normalized_query TEXT PRIMARY KEY,
+        display_query TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('found', 'not_found')),
+        result_json TEXT,
+        fetched_at TEXT NOT NULL,
+        expires_at TEXT,
+        CHECK (
+          (status = 'found' AND result_json IS NOT NULL AND expires_at IS NULL)
+          OR (status = 'not_found' AND result_json IS NULL AND expires_at IS NOT NULL)
+        )
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_dictionary_cache_expiry ON dictionary_cache(expires_at);
     `);
   }
 
@@ -210,6 +230,67 @@ export class WordDatabase {
   totalCount(): number {
     const row = this.#db.prepare("SELECT count(*) AS count FROM words WHERE active = 1").get() as { count: number };
     return row.count;
+  }
+
+  getDictionaryCache(normalizedQuery: string, now = new Date()): DictionaryCacheRecord | null {
+    const row = this.#db.prepare(`
+      SELECT status, result_json, expires_at
+      FROM dictionary_cache
+      WHERE normalized_query = ?
+    `).get(normalizedQuery) as {
+      status: "found" | "not_found";
+      result_json: string | null;
+      expires_at: string | null;
+    } | undefined;
+
+    if (!row) return null;
+    if (row.expires_at && Date.parse(row.expires_at) <= now.getTime()) {
+      this.deleteDictionaryCache(normalizedQuery);
+      return null;
+    }
+    if (row.status === "not_found") return { status: "not_found" };
+
+    try {
+      const result: unknown = JSON.parse(row.result_json ?? "null");
+      if (!isDictionaryResult(result)) throw new Error("Invalid cached dictionary result");
+      return { status: "found", result };
+    } catch {
+      this.deleteDictionaryCache(normalizedQuery);
+      return null;
+    }
+  }
+
+  putDictionaryResult(normalizedQuery: string, displayQuery: string, result: DictionaryResult, now = new Date()): void {
+    this.#db.prepare(`
+      INSERT INTO dictionary_cache (
+        normalized_query, display_query, status, result_json, fetched_at, expires_at
+      ) VALUES (?, ?, 'found', ?, ?, NULL)
+      ON CONFLICT(normalized_query) DO UPDATE SET
+        display_query = excluded.display_query,
+        status = excluded.status,
+        result_json = excluded.result_json,
+        fetched_at = excluded.fetched_at,
+        expires_at = NULL
+    `).run(normalizedQuery, displayQuery, JSON.stringify(result), now.toISOString());
+  }
+
+  putDictionaryMiss(normalizedQuery: string, displayQuery: string, now = new Date()): void {
+    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1_000).toISOString();
+    this.#db.prepare(`
+      INSERT INTO dictionary_cache (
+        normalized_query, display_query, status, result_json, fetched_at, expires_at
+      ) VALUES (?, ?, 'not_found', NULL, ?, ?)
+      ON CONFLICT(normalized_query) DO UPDATE SET
+        display_query = excluded.display_query,
+        status = excluded.status,
+        result_json = NULL,
+        fetched_at = excluded.fetched_at,
+        expires_at = excluded.expires_at
+    `).run(normalizedQuery, displayQuery, now.toISOString(), expiresAt);
+  }
+
+  deleteDictionaryCache(normalizedQuery: string): void {
+    this.#db.prepare("DELETE FROM dictionary_cache WHERE normalized_query = ?").run(normalizedQuery);
   }
 
   close(): void {

@@ -8,7 +8,10 @@ import {
 } from "discord.js";
 import type { Config } from "./config.js";
 import type { WordDatabase } from "./database.js";
-import { createWordEmbed } from "./embeds.js";
+import { DictionaryLookupService } from "./dictionary-service.js";
+import type { LookupDirection } from "./dictionary-types.js";
+import { createDictionaryEmbeds, createWordEmbed, plainText } from "./embeds.js";
+import { PonsApiError, PonsClient } from "./pons-client.js";
 import { WordPostService } from "./post-service.js";
 import { DailyScheduler } from "./scheduler.js";
 import { getLocalTime } from "./time.js";
@@ -22,6 +25,7 @@ export function createBot(config: Config, database: WordDatabase): BotRuntime {
   const client = new Client({ intents: [GatewayIntentBits.Guilds] });
   const posts = new WordPostService(client, database, config);
   const scheduler = new DailyScheduler(posts, database, config);
+  const dictionary = new DictionaryLookupService(database, new PonsClient(config.ponsApiSecret));
 
   client.once(Events.ClientReady, (readyClient) => {
     console.log(`Logged in as ${readyClient.user.tag}`);
@@ -34,34 +38,87 @@ export function createBot(config: Config, database: WordDatabase): BotRuntime {
 
     try {
       if (interaction.commandName === "word") {
-        await handleWord(interaction, database);
+        await handleWord(interaction, dictionary);
       } else if (interaction.commandName === "wotd") {
         await handleWotd(interaction, config, database, posts);
       }
     } catch (error) {
       console.error(`Command /${interaction.commandName} failed:`, error);
-      const response = { content: "Something went wrong while running that command.", flags: MessageFlags.Ephemeral } as const;
-      if (interaction.replied || interaction.deferred) await interaction.followUp(response);
-      else await interaction.reply(response);
+      const content = "Something went wrong while running that command.";
+      if (interaction.deferred) await interaction.editReply({ content });
+      else if (interaction.replied) await interaction.followUp({ content, flags: MessageFlags.Ephemeral });
+      else await interaction.reply({ content, flags: MessageFlags.Ephemeral });
     }
   });
 
   return { client, scheduler };
 }
 
-async function handleWord(interaction: ChatInputCommandInteraction, database: WordDatabase): Promise<void> {
+export async function handleWord(
+  interaction: ChatInputCommandInteraction,
+  dictionary: DictionaryLookupService,
+): Promise<void> {
   const query = interaction.options.getString("query", true);
-  const word = database.findWord(query);
+  const directionValue = interaction.options.getString("direction") ?? "auto";
+  const direction: LookupDirection = isLookupDirection(directionValue) ? directionValue : "auto";
+  const refresh = interaction.options.getBoolean("refresh") ?? false;
 
-  if (!word) {
+  if (refresh && !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
     await interaction.reply({
-      content: `I couldn't find **${query}** in the curated dictionary yet.`,
+      content: "You need the Manage Server permission to refresh dictionary entries.",
       flags: MessageFlags.Ephemeral,
     });
     return;
   }
 
-  await interaction.reply({ embeds: [createWordEmbed(word)] });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+  try {
+    const outcome = await dictionary.lookup(query, { userId: interaction.user.id, refresh });
+    if (outcome.status === "cooldown") {
+      await interaction.editReply(`Please wait ${outcome.retryAfterSeconds} second${outcome.retryAfterSeconds === 1 ? "" : "s"} before looking up another uncached word.`);
+      return;
+    }
+    if (outcome.status === "not_found") {
+      await interaction.editReply({
+        content: `I couldn't find **${plainText(query)}** in the PONS German–English dictionary.`,
+        allowedMentions: { parse: [] },
+      });
+      return;
+    }
+
+    const embeds = createDictionaryEmbeds(outcome.result, direction);
+    if (embeds.length === 0) {
+      await interaction.editReply({
+        content: `I couldn't find **${plainText(query)}** in the requested translation direction.`,
+        allowedMentions: { parse: [] },
+      });
+      return;
+    }
+
+    // Complete the deferred ephemeral response first. Discord may otherwise treat
+    // the first follow-up as the original response and preserve its ephemerality.
+    await interaction.editReply("Publishing the dictionary result…");
+    await interaction.followUp({
+      embeds,
+      allowedMentions: { parse: [] },
+    });
+    await interaction.deleteReply();
+  } catch (error) {
+    if (!(error instanceof PonsApiError)) throw error;
+    console.error(`PONS lookup failed (${error.kind}${error.status ? `, HTTP ${error.status}` : ""}).`);
+    if (error.kind === "quota") {
+      await interaction.editReply("The monthly PONS dictionary lookup allowance has been exhausted. Please try again later.");
+    } else if (error.kind === "authentication" || error.kind === "configuration") {
+      await interaction.editReply("The dictionary service is not configured correctly. Please contact a server administrator.");
+    } else {
+      await interaction.editReply("The dictionary service is temporarily unavailable. Please try again later.");
+    }
+  }
+}
+
+function isLookupDirection(value: string): value is LookupDirection {
+  return value === "auto" || value === "de-en" || value === "en-de";
 }
 
 async function handleWotd(

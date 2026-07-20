@@ -1,4 +1,4 @@
-# documentation: https://github.com/Zerophyr/wotd-bot
+# documentation: https://github.com/Zerophyr/wotd-discord
 # slogan: A scheduled German Word of the Day bot for Discord.
 # category: communication
 # tags: discord, german, language-learning, word-of-the-day
@@ -12,6 +12,7 @@ services:
       - DISCORD_TOKEN=${DISCORD_TOKEN:?}
       - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID:?}
       - DISCORD_GUILD_ID=${DISCORD_GUILD_ID:-}
+      - PONS_API_SECRET=${PONS_API_SECRET:?}
       - WOTD_CHANNEL_ID=${WOTD_CHANNEL_ID:?}
       - WOTD_POST_TIME=${WOTD_POST_TIME:-10:00}
       - WOTD_TIMEZONE=${WOTD_TIMEZONE:-Europe/Berlin}

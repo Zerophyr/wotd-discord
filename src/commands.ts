@@ -9,7 +9,23 @@ export const commandBuilders = [
         .setName("query")
         .setDescription("A German word or English meaning")
         .setRequired(true)
+        .setMinLength(1)
         .setMaxLength(100),
+    )
+    .addStringOption((option) =>
+      option
+        .setName("direction")
+        .setDescription("Translation direction (defaults to automatic)")
+        .addChoices(
+          { name: "Automatic", value: "auto" },
+          { name: "German → English", value: "de-en" },
+          { name: "English → German", value: "en-de" },
+        ),
+    )
+    .addBooleanOption((option) =>
+      option
+        .setName("refresh")
+        .setDescription("Refresh the cached result (Manage Server permission required)"),
     ),
   new SlashCommandBuilder()
     .setName("wotd")
