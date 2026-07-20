@@ -7,7 +7,7 @@ A small Discord bot that automatically posts a curated German word every day. It
 - Daily post at a configurable time in `Europe/Berlin` (or another IANA timezone)
 - Weekday category rotation: everyday German, verbs, slang, unique words, colloquialisms, false friends, and idioms
 - SQLite history so restarts do not cause duplicate posts
-- PONS-backed `/word` German↔English lookup in every permitted channel
+- Private PONS-backed `/word` German↔English lookup in every permitted channel
 - On-demand SQLite dictionary cache so repeated lookups do not consume API quota
 - `/wotd preview`, `/wotd post`, and `/wotd status` for members with **Manage Server**
 - 70 curated entries: ten words in each weekday category
@@ -81,7 +81,7 @@ The current deployment manages one Word-of-the-Day channel. The bot may be invit
 
 ## Dictionary lookup
 
-`/word` uses the PONS German–English dictionary and responds publicly in the channel where the command is invoked. It is not restricted to `WOTD_CHANNEL_ID`; Discord channel permissions determine where members can use it.
+`/word` uses the PONS German–English dictionary and responds privately, so only the member who invoked the command can see the result. It is not restricted to `WOTD_CHANNEL_ID`; Discord channel permissions determine where members can use it.
 
 ```text
 /word query:Haus
@@ -90,6 +90,8 @@ The current deployment manages one Word-of-the-Day channel. The bot may be invit
 ```
 
 Automatic direction can show German→English and English→German results when a spelling exists in both languages. The optional direction narrows the response. `refresh` requires **Manage Server**.
+
+Each member can submit one lookup every 10 seconds. If they retry too soon, the bot shows the remaining wait time privately and asks them to retry.
 
 Only words requested by users are sent to PONS. Successful normalized results are retained in SQLite indefinitely and reused across restarts. A failed no-result lookup is cached for 24 hours. PONS currently advertises a free allowance of 1,000 reference queries per month; cached lookups do not consume another query.
 

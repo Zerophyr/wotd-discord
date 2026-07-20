@@ -87,16 +87,17 @@ function replyContent(value: unknown): string {
 }
 
 describe("/word command", () => {
-  it("publishes successful lookups in whichever channel invokes it", async () => {
+  it("shows successful lookups only to the invoking user in any permitted channel", async () => {
     for (const channelId of ["channel-1", "channel-2"]) {
       const { interaction, calls } = interactionMock({ channelId });
       await handleWord(interaction, serviceMock({ status: "found", result, cached: false }));
       assert.deepEqual(calls.deferReply, [{ flags: MessageFlags.Ephemeral }]);
-      assert.equal(calls.followUp.length, 1);
-      assert.deepEqual((calls.followUp[0] as { allowedMentions: unknown }).allowedMentions, { parse: [] });
-      assert.equal(calls.deleteReply, 1);
-      assert.deepEqual(calls.editReply, ["Publishing the dictionary result…"]);
-      assert.deepEqual(calls.order, ["deferReply", "editReply", "followUp", "deleteReply"]);
+      assert.equal(calls.followUp.length, 0);
+      assert.equal(calls.deleteReply, 0);
+      assert.equal(calls.editReply.length, 1);
+      assert.deepEqual((calls.editReply[0] as { allowedMentions: unknown }).allowedMentions, { parse: [] });
+      assert.equal((calls.editReply[0] as { embeds: unknown[] }).embeds.length, 1);
+      assert.deepEqual(calls.order, ["deferReply", "editReply"]);
     }
   });
 
@@ -121,7 +122,7 @@ describe("/word command", () => {
     const cooldown = interactionMock({ channelId: "channel-1" });
     await handleWord(cooldown.interaction, serviceMock({ status: "cooldown", retryAfterSeconds: 4 }));
     assert.equal(cooldown.calls.followUp.length, 0);
-    assert.match(String(cooldown.calls.editReply[0]), /wait 4 seconds/);
+    assert.match(String(cooldown.calls.editReply[0]), /wait 4 seconds, then retry/);
   });
 
   it("keeps provider failures ephemeral and gives useful status-specific messages", async () => {

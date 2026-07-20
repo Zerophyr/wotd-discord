@@ -2,7 +2,7 @@ import type { WordDatabase } from "./database.js";
 import type { DictionaryLookupOutcome } from "./dictionary-types.js";
 import type { PonsClient } from "./pons-client.js";
 
-const COOLDOWN_MS = 5_000;
+const COOLDOWN_MS = 10_000;
 
 export interface LookupOptions {
   userId: string;
@@ -12,7 +12,7 @@ export interface LookupOptions {
 
 export class DictionaryLookupService {
   readonly #inFlight = new Map<string, Promise<DictionaryLookupOutcome>>();
-  readonly #lastExternalLookupByUser = new Map<string, number>();
+  readonly #lastLookupByUser = new Map<string, number>();
 
   constructor(
     private readonly database: WordDatabase,
@@ -22,6 +22,15 @@ export class DictionaryLookupService {
   async lookup(query: string, options: LookupOptions): Promise<DictionaryLookupOutcome> {
     const normalizedQuery = normalizeDictionaryQuery(query);
     const now = options.now ?? new Date();
+
+    const lastLookup = this.#lastLookupByUser.get(options.userId);
+    if (lastLookup !== undefined && now.getTime() - lastLookup < COOLDOWN_MS) {
+      return {
+        status: "cooldown",
+        retryAfterSeconds: Math.max(1, Math.ceil((COOLDOWN_MS - (now.getTime() - lastLookup)) / 1_000)),
+      };
+    }
+    this.#lastLookupByUser.set(options.userId, now.getTime());
 
     if (!options.refresh) {
       const cached = this.database.getDictionaryCache(normalizedQuery, now);
@@ -34,15 +43,6 @@ export class DictionaryLookupService {
 
     const running = this.#inFlight.get(normalizedQuery);
     if (running) return running;
-
-    const lastLookup = this.#lastExternalLookupByUser.get(options.userId);
-    if (lastLookup !== undefined && now.getTime() - lastLookup < COOLDOWN_MS) {
-      return {
-        status: "cooldown",
-        retryAfterSeconds: Math.max(1, Math.ceil((COOLDOWN_MS - (now.getTime() - lastLookup)) / 1_000)),
-      };
-    }
-    this.#lastExternalLookupByUser.set(options.userId, now.getTime());
 
     const request = this.#fetchAndCache(query.trim(), normalizedQuery, now);
     this.#inFlight.set(normalizedQuery, request);

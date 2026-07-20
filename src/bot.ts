@@ -76,7 +76,7 @@ export async function handleWord(
   try {
     const outcome = await dictionary.lookup(query, { userId: interaction.user.id, refresh });
     if (outcome.status === "cooldown") {
-      await interaction.editReply(`Please wait ${outcome.retryAfterSeconds} second${outcome.retryAfterSeconds === 1 ? "" : "s"} before looking up another uncached word.`);
+      await interaction.editReply(`Please wait ${outcome.retryAfterSeconds} second${outcome.retryAfterSeconds === 1 ? "" : "s"}, then retry your lookup.`);
       return;
     }
     if (outcome.status === "not_found") {
@@ -96,14 +96,10 @@ export async function handleWord(
       return;
     }
 
-    // Complete the deferred ephemeral response first. Discord may otherwise treat
-    // the first follow-up as the original response and preserve its ephemerality.
-    await interaction.editReply("Publishing the dictionary result…");
-    await interaction.followUp({
+    await interaction.editReply({
       embeds,
       allowedMentions: { parse: [] },
     });
-    await interaction.deleteReply();
   } catch (error) {
     if (!(error instanceof PonsApiError)) throw error;
     console.error(`PONS lookup failed (${error.kind}${error.status ? `, HTTP ${error.status}` : ""}).`);

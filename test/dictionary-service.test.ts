@@ -72,14 +72,19 @@ describe("DictionaryLookupService", () => {
     database.close();
   });
 
-  it("rate-limits consecutive uncached queries from one user", async () => {
+  it("rate-limits every consecutive query from one user for ten seconds", async () => {
     const database = new WordDatabase(":memory:");
+    database.putDictionaryResult("haus", "Haus", result);
     const client = new PonsClient("secret", async () => new Response(null, { status: 204 }));
     const service = new DictionaryLookupService(database, client);
     const now = new Date("2026-07-20T10:00:00Z");
-    assert.equal((await service.lookup("first", { userId: "user-1", now })).status, "not_found");
-    const second = await service.lookup("second", { userId: "user-1", now: new Date(now.getTime() + 1_000) });
-    assert.deepEqual(second, { status: "cooldown", retryAfterSeconds: 4 });
+    assert.equal((await service.lookup("Haus", { userId: "user-1", now })).status, "found");
+    const second = await service.lookup("Haus", { userId: "user-1", now: new Date(now.getTime() + 1_000) });
+    assert.deepEqual(second, { status: "cooldown", retryAfterSeconds: 9 });
+    assert.equal((await service.lookup("Haus", {
+      userId: "user-1",
+      now: new Date(now.getTime() + 10_000),
+    })).status, "found");
     database.close();
   });
 
