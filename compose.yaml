@@ -1,0 +1,35 @@
+# documentation: https://github.com/Zerophyr/wotd-bot
+# slogan: A scheduled German Word of the Day bot for Discord.
+# category: communication
+# tags: discord, german, language-learning, word-of-the-day
+
+services:
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}
+      - DISCORD_GUILD_ID=${DISCORD_GUILD_ID:-}
+      - WOTD_CHANNEL_ID=${WOTD_CHANNEL_ID}
+      - WOTD_POST_TIME=${WOTD_POST_TIME:-10:00}
+      - WOTD_TIMEZONE=${WOTD_TIMEZONE:-Europe/Berlin}
+      - DATABASE_PATH=/app/data/wotd.sqlite
+      - HEALTHCHECK_PATH=/tmp/wotd-bot-healthy
+    volumes:
+      - wotd-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "const fs=require('node:fs');const age=Date.now()-fs.statSync('/tmp/wotd-bot-healthy').mtimeMs;process.exit(age<=90000?0:1)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  wotd-data:

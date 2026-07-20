@@ -1,0 +1,28 @@
+{
+  "name": "deutschden-wotd-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A Discord Word-of-the-Day bot for German learners.",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit",
+    "dev": "node --env-file=.env --import tsx --watch src/index.ts",
+    "register": "node --env-file=.env --import tsx src/register-commands.ts",
+    "start": "node dist/index.js",
+    "test": "tsx --test test/**/*.test.ts"
+  },
+  "dependencies": {
+    "better-sqlite3": "12.6.2",
+    "discord.js": "14.27.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "7.6.13",
+    "@types/node": "24.10.1",
+    "tsx": "4.23.1",
+    "typescript": "5.9.3"
+  }
+}
