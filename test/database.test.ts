@@ -55,12 +55,13 @@ describe("WordDatabase", () => {
     assert.equal(database.remainingCount(), 69);
   });
 
-  it("discards corrupt cached dictionary JSON", () => {
+  it("discards outdated and corrupt cached dictionary JSON", () => {
     const directory = mkdtempSync(join(tmpdir(), "wotd-database-test-"));
     const path = join(directory, "test.sqlite");
     try {
       const fileDatabase = new WordDatabase(path);
       const result: DictionaryResult = {
+        schemaVersion: 2,
         provider: "pons",
         query: "Haus",
         fetchedAt: "2026-07-20T10:00:00.000Z",
@@ -70,14 +71,24 @@ describe("WordDatabase", () => {
           entries: [{
             headword: "Haus",
             headwordFull: "Haus",
+            pronunciation: null,
             wordClass: "noun",
-            translations: [{ source: "Haus", target: "house" }],
+            senses: [{ label: null, translations: [{ source: "Haus", target: "house" }] }],
           }],
         }],
       };
       fileDatabase.putDictionaryResult("haus", "Haus", result);
 
       const rawDatabase = new SqliteDatabase(path);
+      rawDatabase.prepare("UPDATE dictionary_cache SET result_json = ? WHERE normalized_query = ?").run(JSON.stringify({
+        provider: "pons",
+        query: "Haus",
+        fetchedAt: "2026-07-20T10:00:00.000Z",
+        directions: [],
+      }), "haus");
+      assert.equal(fileDatabase.getDictionaryCache("haus"), null);
+
+      fileDatabase.putDictionaryResult("haus", "Haus", result);
       rawDatabase.prepare("UPDATE dictionary_cache SET result_json = ? WHERE normalized_query = ?").run("{broken", "haus");
       rawDatabase.close();
 

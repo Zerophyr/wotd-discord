@@ -7,6 +7,7 @@ import type { DictionaryLookupOutcome, DictionaryResult } from "../src/dictionar
 import { PonsApiError } from "../src/pons-client.js";
 
 const result: DictionaryResult = {
+  schemaVersion: 2,
   provider: "pons",
   query: "Haus",
   fetchedAt: "2026-07-20T10:00:00.000Z",
@@ -16,8 +17,9 @@ const result: DictionaryResult = {
     entries: [{
       headword: "Haus",
       headwordFull: "Haus",
+      pronunciation: null,
       wordClass: "noun",
-      translations: [{ source: "Haus", target: "house" }],
+      senses: [{ label: null, translations: [{ source: "Haus", target: "house" }] }],
     }],
   }],
 };

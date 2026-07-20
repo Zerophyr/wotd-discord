@@ -11,7 +11,7 @@ const fixture = [
         roms: [
           {
             headword: "Haus",
-            headword_full: "<strong>Haus</strong> &lt;-es, Häuser&gt;",
+            headword_full: "<strong>Haus</strong> [haʊs] &lt;-es, Häuser&gt;",
             wordclass: "noun",
             arabs: [
               {
@@ -66,6 +66,7 @@ describe("PonsClient", () => {
     assert.equal(capturedUrl.searchParams.get("language"), "en");
     assert.equal(capturedUrl.toString().includes("super-secret"), false);
     assert.equal(new Headers(capturedInit?.headers).get("X-Secret"), "super-secret");
+    assert.equal(result.schemaVersion, 2);
     assert.equal(result.directions.length, 2);
   });
 
@@ -74,9 +75,37 @@ describe("PonsClient", () => {
     assert.equal(result[0]?.sourceLanguage, "de");
     assert.deepEqual(result[0]?.entries.map(({ headword }) => headword), ["Haus", "Häuschen", "Gebäude"]);
     assert.equal(result[0]?.entries[0]?.wordClass, "noun");
-    assert.deepEqual(result[1]?.entries[0]?.translations, [
+    assert.equal(result[0]?.entries[0]?.pronunciation, "[haʊs]");
+    assert.equal(result[0]?.entries[0]?.senses[0]?.label, "1");
+    assert.deepEqual(result[1]?.entries[0]?.senses[0]?.translations, [
       { source: "house", target: "Haus" },
       { source: "house", target: "Gebäude" },
+    ]);
+  });
+
+  it("preserves distinct meanings for ambiguous headwords", () => {
+    const result = parsePonsResponse([{
+      lang: "en",
+      hits: [{
+        type: "entry",
+        roms: [{
+          headword: "plane",
+          headword_full: "<strong>plane</strong><sup>1</sup> [pleɪn]",
+          wordclass: "noun",
+          arabs: [
+            { header: "1. plane (surface)", translations: [{ source: "plane", target: "Fläche" }] },
+            { header: "2. plane (level)", translations: [{ source: "plane", target: "Ebene" }] },
+            { header: "3. plane (aircraft)", translations: [{ source: "plane", target: "Flugzeug" }] },
+          ],
+        }],
+      }],
+    }], "plane");
+
+    assert.equal(result[0]?.entries[0]?.pronunciation, "[pleɪn]");
+    assert.deepEqual(result[0]?.entries[0]?.senses.map(({ label }) => label), [
+      "1. plane (surface)",
+      "2. plane (level)",
+      "3. plane (aircraft)",
     ]);
   });
 

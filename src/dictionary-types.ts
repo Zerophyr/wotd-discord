@@ -6,11 +6,17 @@ export interface DictionaryTranslation {
   target: string;
 }
 
+export interface DictionarySense {
+  label: string | null;
+  translations: DictionaryTranslation[];
+}
+
 export interface DictionaryEntry {
   headword: string;
   headwordFull: string;
+  pronunciation: string | null;
   wordClass: string | null;
-  translations: DictionaryTranslation[];
+  senses: DictionarySense[];
 }
 
 export interface DictionaryDirectionResult {
@@ -20,6 +26,7 @@ export interface DictionaryDirectionResult {
 }
 
 export interface DictionaryResult {
+  schemaVersion: 2;
   provider: "pons";
   query: string;
   fetchedAt: string;
@@ -32,7 +39,7 @@ export type DictionaryLookupOutcome =
   | { status: "cooldown"; retryAfterSeconds: number };
 
 export function isDictionaryResult(value: unknown): value is DictionaryResult {
-  if (!isRecord(value) || value.provider !== "pons" || typeof value.query !== "string" || typeof value.fetchedAt !== "string") {
+  if (!isRecord(value) || value.schemaVersion !== 2 || value.provider !== "pons" || typeof value.query !== "string" || typeof value.fetchedAt !== "string") {
     return false;
   }
   if (!Array.isArray(value.directions) || value.directions.length === 0) return false;
@@ -42,10 +49,14 @@ export function isDictionaryResult(value: unknown): value is DictionaryResult {
     if (!Array.isArray(direction.entries) || direction.entries.length === 0) return false;
     return direction.entries.every((entry) => {
       if (!isRecord(entry) || typeof entry.headword !== "string" || typeof entry.headwordFull !== "string") return false;
+      if (entry.pronunciation !== null && typeof entry.pronunciation !== "string") return false;
       if (entry.wordClass !== null && typeof entry.wordClass !== "string") return false;
-      return Array.isArray(entry.translations) && entry.translations.length > 0 && entry.translations.every((translation) =>
-        isRecord(translation) && typeof translation.source === "string" && typeof translation.target === "string",
-      );
+      return Array.isArray(entry.senses) && entry.senses.length > 0 && entry.senses.every((sense) => {
+        if (!isRecord(sense) || (sense.label !== null && typeof sense.label !== "string")) return false;
+        return Array.isArray(sense.translations) && sense.translations.length > 0 && sense.translations.every((translation) =>
+          isRecord(translation) && typeof translation.source === "string" && typeof translation.target === "string",
+        );
+      });
     });
   });
 }

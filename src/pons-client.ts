@@ -4,12 +4,14 @@ import {
   type DictionaryEntry,
   type DictionaryLanguage,
   type DictionaryResult,
+  type DictionarySense,
   type DictionaryTranslation,
 } from "./dictionary-types.js";
 
 const PONS_ENDPOINT = "https://api.pons.com/v1/dictionary";
 const MAX_ENTRIES_PER_DIRECTION = 20;
-const MAX_TRANSLATIONS_PER_ENTRY = 20;
+const MAX_SENSES_PER_ENTRY = 20;
+const MAX_TRANSLATIONS_PER_SENSE = 3;
 
 export type PonsErrorKind = "authentication" | "quota" | "configuration" | "temporary" | "invalid_response";
 
@@ -73,6 +75,7 @@ export class PonsClient {
     const directions = parsePonsResponse(payload, query);
     if (directions.length === 0) return null;
     return {
+      schemaVersion: 2,
       provider: "pons",
       query,
       fetchedAt: now.toISOString(),
@@ -112,12 +115,13 @@ export function parsePonsResponse(payload: unknown, query: string): DictionaryDi
       entries.unshift({
         headword: query,
         headwordFull: query,
+        pronunciation: null,
         wordClass: null,
-        translations: looseTranslations.slice(0, MAX_TRANSLATIONS_PER_ENTRY),
+        senses: [{ label: null, translations: looseTranslations.slice(0, MAX_TRANSLATIONS_PER_SENSE) }],
       });
     }
 
-    const usableEntries = entries.filter((entry) => entry.translations.length > 0).slice(0, MAX_ENTRIES_PER_DIRECTION);
+    const usableEntries = entries.filter((entry) => entry.senses.length > 0).slice(0, MAX_ENTRIES_PER_DIRECTION);
     if (usableEntries.length > 0) {
       directions.push({
         sourceLanguage,
@@ -136,29 +140,43 @@ function parseEntry(entry: Record<string, unknown>): DictionaryEntry[] {
 
   for (const rom of entry.roms) {
     if (!isRecord(rom) || typeof rom.headword !== "string") continue;
-    const translations: DictionaryTranslation[] = [];
+    const senses: DictionarySense[] = [];
     if (Array.isArray(rom.arabs)) {
       for (const arab of rom.arabs) {
         if (!isRecord(arab) || !Array.isArray(arab.translations)) continue;
+        const translations: DictionaryTranslation[] = [];
         for (const rawTranslation of arab.translations) {
           if (!isRecord(rawTranslation)) continue;
           const translation = parseTranslation(rawTranslation);
           if (translation) translations.push(translation);
-          if (translations.length >= MAX_TRANSLATIONS_PER_ENTRY) break;
+          if (translations.length >= MAX_TRANSLATIONS_PER_SENSE) break;
         }
-        if (translations.length >= MAX_TRANSLATIONS_PER_ENTRY) break;
+        if (translations.length > 0) {
+          senses.push({
+            label: typeof arab.header === "string" ? arab.header : null,
+            translations,
+          });
+        }
+        if (senses.length >= MAX_SENSES_PER_ENTRY) break;
       }
     }
 
+    const headwordFull = typeof rom.headword_full === "string" ? rom.headword_full : rom.headword;
     parsed.push({
       headword: rom.headword,
-      headwordFull: typeof rom.headword_full === "string" ? rom.headword_full : rom.headword,
+      headwordFull,
+      pronunciation: extractPronunciation(headwordFull),
       wordClass: typeof rom.wordclass === "string" ? rom.wordclass : null,
-      translations,
+      senses,
     });
   }
 
   return parsed;
+}
+
+export function extractPronunciation(headwordFull: string): string | null {
+  const withoutTags = headwordFull.replace(/<[^>]*>/g, "");
+  return withoutTags.match(/\[[^\]\r\n]{1,100}\]/u)?.[0] ?? null;
 }
 
 function parseTranslation(value: Record<string, unknown>): DictionaryTranslation | null {

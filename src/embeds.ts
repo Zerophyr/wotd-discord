@@ -1,5 +1,5 @@
 import { EmbedBuilder } from "discord.js";
-import type { DictionaryResult, LookupDirection } from "./dictionary-types.js";
+import type { DictionaryEntry, DictionaryResult, DictionaryTranslation, LookupDirection } from "./dictionary-types.js";
 import type { Word } from "./types.js";
 
 const categoryLabels: Record<Word["category"], string> = {
@@ -65,19 +65,49 @@ export function createDictionaryEmbeds(result: DictionaryResult, direction: Look
         .setFooter({ text: "Source: PONS Online Dictionary" });
 
       for (const entry of item.entries.slice(0, 3)) {
-        const fullHeadword = plainText(entry.headwordFull || entry.headword);
-        const wordClass = entry.wordClass ? ` · ${plainText(entry.wordClass)}` : "";
-        const lines = entry.translations.slice(0, 3).map((translation) =>
-          `${plainText(translation.source)} → **${plainText(translation.target)}**`,
-        );
+        const lines = selectSenseTranslations(entry).map(({ label, translation }) => {
+          const senseLabel = label ? `${plainText(label)} ` : "";
+          return `${senseLabel}${plainText(translation.source)} → **${plainText(translation.target)}**`;
+        });
         embed.addFields({
-          name: truncate(`${fullHeadword}${wordClass}`, DICTIONARY_FIELD_NAME_LIMIT),
+          name: dictionaryEntryHeading(entry),
           value: truncate(lines.join("\n") || "No translations available.", DICTIONARY_FIELD_VALUE_LIMIT),
         });
       }
 
       return embed;
     });
+}
+
+function selectSenseTranslations(entry: DictionaryEntry, limit = 3): Array<{
+  label: string | null;
+  translation: DictionaryTranslation;
+}> {
+  const selected: Array<{ label: string | null; translation: DictionaryTranslation }> = [];
+  const maximumDepth = Math.max(...entry.senses.map((sense) => sense.translations.length));
+
+  for (let depth = 0; depth < maximumDepth && selected.length < limit; depth += 1) {
+    for (const sense of entry.senses) {
+      const translation = sense.translations[depth];
+      if (translation) selected.push({ label: depth === 0 ? sense.label : null, translation });
+      if (selected.length >= limit) break;
+    }
+  }
+
+  return selected;
+}
+
+function dictionaryEntryHeading(entry: DictionaryEntry): string {
+  const fullHeadword = plainText(entry.headwordFull || entry.headword);
+  const pronunciation = entry.pronunciation ? plainText(entry.pronunciation) : "";
+  const wordClass = entry.wordClass ? ` · ${plainText(entry.wordClass)}` : "";
+  if (!pronunciation) return truncate(`${fullHeadword}${wordClass}`, DICTIONARY_FIELD_NAME_LIMIT);
+
+  const headwordWithoutPronunciation = fullHeadword.replace(pronunciation, "").replace(/\s+/g, " ").trim();
+  let suffix = ` ${pronunciation}${wordClass}`;
+  if (suffix.length >= DICTIONARY_FIELD_NAME_LIMIT) suffix = ` ${pronunciation}`;
+  const prefixLimit = Math.max(1, DICTIONARY_FIELD_NAME_LIMIT - suffix.length);
+  return `${truncate(headwordWithoutPronunciation, prefixLimit)}${suffix}`;
 }
 
 export function plainText(input: string): string {

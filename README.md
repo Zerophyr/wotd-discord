@@ -91,6 +91,8 @@ The current deployment manages one Word-of-the-Day channel. The bot may be invit
 
 Automatic direction can show German→English and English→German results when a spelling exists in both languages. The optional direction narrows the response. `refresh` requires **Manage Server**.
 
+For ambiguous words, the concise result is spread across distinct meanings instead of showing several examples from only the first meaning. Pronunciation is included whenever PONS provides it.
+
 Each member can submit one lookup every 10 seconds. If they retry too soon, the bot shows the remaining wait time privately and asks them to retry.
 
 Only words requested by users are sent to PONS. Successful normalized results are retained in SQLite indefinitely and reused across restarts. A failed no-result lookup is cached for 24 hours. PONS currently advertises a free allowance of 1,000 reference queries per month; cached lookups do not consume another query.
