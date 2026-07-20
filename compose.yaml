@@ -9,10 +9,10 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      - DISCORD_TOKEN=${DISCORD_TOKEN}
-      - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}
+      - DISCORD_TOKEN=${DISCORD_TOKEN:?}
+      - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID:?}
       - DISCORD_GUILD_ID=${DISCORD_GUILD_ID:-}
-      - WOTD_CHANNEL_ID=${WOTD_CHANNEL_ID}
+      - WOTD_CHANNEL_ID=${WOTD_CHANNEL_ID:?}
       - WOTD_POST_TIME=${WOTD_POST_TIME:-10:00}
       - WOTD_TIMEZONE=${WOTD_TIMEZONE:-Europe/Berlin}
       - DATABASE_PATH=/app/data/wotd.sqlite
