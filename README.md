@@ -9,7 +9,7 @@ A small Discord bot that automatically posts a curated German word every day. It
 - SQLite history so restarts do not cause duplicate posts
 - `/word query:<German or English>` lookup
 - `/wotd preview`, `/wotd post`, and `/wotd status` for members with **Manage Server**
-- 14 starter entries intended for development and formatting review
+- 70 curated entries: ten words in each weekday category
 - Docker deployment with persistent database storage
 
 ## Discord setup
@@ -17,7 +17,20 @@ A small Discord bot that automatically posts a curated German word every day. It
 1. Create an application in the [Discord Developer Portal](https://discord.com/developers/applications) and add a bot.
 2. On **OAuth2 → URL Generator**, select the `bot` and `applications.commands` scopes.
 3. Give the bot these channel permissions: **View Channel**, **Send Messages**, and **Embed Links**.
-4. Invite it to the server and copy the application ID, bot token, server ID, and target channel ID.
+4. Invite it to the server.
+
+Configure these environment variables:
+
+| Variable | Required | Value |
+|---|---:|---|
+| `DISCORD_TOKEN` | Yes | The bot token from **Bot → Reset Token** in the Developer Portal |
+| `DISCORD_CLIENT_ID` | Yes | The application ID from **General Information** |
+| `WOTD_CHANNEL_ID` | Yes | The ID of the Discord channel that should receive the daily post |
+| `DISCORD_GUILD_ID` | No | The server ID; set it for immediate server-scoped command registration, or leave it empty for global commands |
+| `WOTD_POST_TIME` | No | Posting time in `HH:mm` format; defaults to `10:00` |
+| `WOTD_TIMEZONE` | No | IANA timezone; defaults to `Europe/Berlin` |
+
+To copy server and channel IDs, enable **Developer Mode** under Discord's **User Settings → Advanced**, then right-click the server or channel and select **Copy ID**.
 
 Keep the bot token private. Never commit `.env`.
 
@@ -56,9 +69,13 @@ For Docker Compose:
 docker compose up --build -d
 ```
 
-In Coolify, create a **Docker Compose** resource from this Git repository and select `/compose.yaml`. Coolify discovers the editable variables from that file, builds the image, creates the persistent `wotd-data` volume, checks Discord connectivity, and starts the bot. No domain or public port is required because the bot makes an outbound Discord connection.
+In Coolify, create a **Docker Compose** resource from this Git repository and select `/compose.yaml`. Before deploying, open **Environment Variables** and enter values for `DISCORD_TOKEN`, `DISCORD_CLIENT_ID`, and `WOTD_CHANNEL_ID`. Coolify marks these required variables in red while they are empty. `DISCORD_GUILD_ID` is optional.
+
+Coolify then builds the image, creates the persistent `wotd-data` volume, checks Discord connectivity, and starts the bot. No domain or public port is required because the bot makes an outbound Discord connection.
 
 If `DISCORD_GUILD_ID` is omitted, commands are registered globally and Discord may take longer to show the update.
+
+The current deployment manages one Word-of-the-Day channel. The bot may be invited to other servers, but scheduled posting still targets the single channel configured by `WOTD_CHANNEL_ID`. Supporting independently configured channels in multiple servers would require per-server settings in SQLite and a Discord setup command such as `/wotd configure`.
 
 ## Vocabulary and posting behavior
 
@@ -66,4 +83,4 @@ Starter vocabulary is in `src/seed-words.ts`. Existing rows are preserved when t
 
 The scheduler checks twice per minute. If the bot starts after the configured posting time and nothing has been posted that local day, it catches up immediately. If the word pool is exhausted, it logs an error and does not repeat old words.
 
-Before production use, expand and proofread the seed list. The included 14 entries are enough to exercise every category, not to operate a long-running daily channel.
+The included 70 entries provide ten weeks of unique daily posts. Continue expanding and proofreading the pool before those ten weeks elapse; exhausted words are never repeated automatically.
