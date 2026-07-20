@@ -33,6 +33,7 @@ interface InteractionCalls {
 
 function interactionMock(options: {
   channelId: string;
+  query?: string;
   direction?: string;
   refresh?: boolean;
   manageGuild?: boolean;
@@ -47,7 +48,7 @@ function interactionMock(options: {
     memberPermissions: permissions,
     options: {
       getString: (name: string, required?: boolean) => {
-        if (name === "query") return "Haus";
+        if (name === "query") return options.query ?? "Haus";
         if (name === "direction") return options.direction ?? null;
         if (required) throw new Error(`Missing ${name}`);
         return null;
@@ -87,6 +88,30 @@ function replyContent(value: unknown): string {
 }
 
 describe("/word command", () => {
+  it("rejects phrases and sentences before lookup", async () => {
+    for (const query of ["zwei Wörter", "Ich gehe nach Hause.", "hello!", "1234"]) {
+      let lookupCalls = 0;
+      const { interaction, calls } = interactionMock({ channelId: "channel-1", query });
+      await handleWord(interaction, serviceMock(
+        { status: "found", result, cached: false },
+        () => { lookupCalls += 1; },
+      ));
+      assert.equal(lookupCalls, 0);
+      assert.equal(calls.deferReply.length, 0);
+      assert.match(replyContent(calls.reply[0]), /single word without spaces/);
+      assert.deepEqual((calls.reply[0] as { flags: unknown }).flags, MessageFlags.Ephemeral);
+    }
+  });
+
+  it("allows hyphenated words, apostrophes, and surrounding whitespace", async () => {
+    for (const query of ["E-Mail", "3D-Druck", "don't", "  Häuser  "]) {
+      const { interaction, calls } = interactionMock({ channelId: "channel-1", query });
+      await handleWord(interaction, serviceMock({ status: "found", result, cached: true }));
+      assert.equal(calls.reply.length, 0);
+      assert.deepEqual(calls.deferReply, [{ flags: MessageFlags.Ephemeral }]);
+    }
+  });
+
   it("shows successful lookups only to the invoking user in any permitted channel", async () => {
     for (const channelId of ["channel-1", "channel-2"]) {
       const { interaction, calls } = interactionMock({ channelId });

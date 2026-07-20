@@ -58,10 +58,18 @@ export async function handleWord(
   interaction: ChatInputCommandInteraction,
   dictionary: DictionaryLookupService,
 ): Promise<void> {
-  const query = interaction.options.getString("query", true);
+  const query = interaction.options.getString("query", true).trim();
   const directionValue = interaction.options.getString("direction") ?? "auto";
   const direction: LookupDirection = isLookupDirection(directionValue) ? directionValue : "auto";
   const refresh = interaction.options.getBoolean("refresh") ?? false;
+
+  if (!isSingleWordQuery(query)) {
+    await interaction.reply({
+      content: "Please enter a single word without spaces. Hyphens and apostrophes are allowed.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
 
   if (refresh && !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
     await interaction.reply({
@@ -115,6 +123,10 @@ export async function handleWord(
 
 function isLookupDirection(value: string): value is LookupDirection {
   return value === "auto" || value === "de-en" || value === "en-de";
+}
+
+export function isSingleWordQuery(value: string): boolean {
+  return /^(?=.*\p{L})[\p{L}\p{N}]+(?:[-'’][\p{L}\p{N}]+)*$/u.test(value);
 }
 
 async function handleWotd(

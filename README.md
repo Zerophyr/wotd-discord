@@ -81,7 +81,7 @@ The current deployment manages one Word-of-the-Day channel. The bot may be invit
 
 ## Dictionary lookup
 
-`/word` uses the PONS German–English dictionary and responds privately, so only the member who invoked the command can see the result. It is not restricted to `WOTD_CHANNEL_ID`; Discord channel permissions determine where members can use it.
+`/word` accepts one German or English word and uses the PONS German–English dictionary. Phrases and sentences are rejected; hyphenated words and apostrophes are supported. Responses are private, so only the member who invoked the command can see the result. It is not restricted to `WOTD_CHANNEL_ID`; Discord channel permissions determine where members can use it.
 
 ```text
 /word query:Haus
