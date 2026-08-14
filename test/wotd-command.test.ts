@@ -54,12 +54,12 @@ describe("/wotd reset", () => {
     const unauthorized = resetInteraction(true, false);
     await handleWotd(unauthorized.interaction, config, database, posts);
     assert.match(String((unauthorized.replies[0] as { content: string }).content), /Manage Server/);
-    assert.equal(database.remainingCount(), 69);
+    assert.equal(database.remainingCount(), 139);
 
     const cancelled = resetInteraction(false);
     await handleWotd(cancelled.interaction, config, database, posts);
     assert.match(String((cancelled.replies[0] as { content: string }).content), /cancelled/);
-    assert.equal(database.remainingCount(), 69);
+    assert.equal(database.remainingCount(), 139);
 
     database.close();
   });
@@ -73,7 +73,7 @@ describe("/wotd reset", () => {
 
     await handleWotd(interaction, config, database, {} as WordPostService);
 
-    assert.equal(database.remainingCount(), 70);
+    assert.equal(database.remainingCount(), 140);
     assert.equal(database.isAutomaticPostingSuppressed(getLocalTime(new Date(), config.timezone).date), true);
     assert.equal((replies[0] as { flags: unknown }).flags, MessageFlags.Ephemeral);
     assert.match((replies[0] as { content: string }).content, /Reset complete/);

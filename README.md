@@ -11,7 +11,7 @@ A small Discord bot that automatically posts a curated German word every day. It
 - On-demand SQLite dictionary cache so repeated lookups do not consume API quota
 - `/wotd preview`, `/wotd post`, and `/wotd status` for members with **Manage Server**
 - Confirmed `/wotd reset` for restarting the posting rotation without clearing dictionary cache
-- 70 curated entries: ten words in each weekday category
+- 140 curated entries: twenty words in each weekday category
 - Docker deployment with persistent database storage
 
 ## Discord setup
@@ -106,8 +106,8 @@ Members with **Manage Server** can run `/wotd reset confirm:True` to make every 
 
 ## Vocabulary and posting behavior
 
-Starter vocabulary is in `src/seed-words.ts`. Existing rows are preserved when the bot restarts, while newly added seed words are inserted automatically. A word is never selected after it appears in `post_history`.
+Starter vocabulary is in `src/seed-words.ts` and `src/additional-seed-words.ts`. Existing rows are preserved when the bot restarts, while newly added seed words are inserted automatically. A word is not selected again during the same complete rotation.
 
-The scheduler checks twice per minute. If the bot starts after the configured posting time and nothing has been posted that local day, it catches up immediately. If the word pool is exhausted, it logs an error and does not repeat old words.
+The scheduler checks twice per minute. If the bot starts after the configured posting time and nothing has been posted that local day, it catches up immediately. After all active words have been posted, the bot clears only the posting history and automatically starts a new rotation. The weekday category schedule remains in place, and each category resumes at its first entry.
 
-The included 70 entries provide ten weeks of unique daily posts. Continue expanding and proofreading the pool before those ten weeks elapse; exhausted words are never repeated automatically.
+The included 140 entries provide twenty weeks of unique daily posts before the pool repeats.

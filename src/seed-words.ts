@@ -1,4 +1,5 @@
 import type { SeedWord } from "./types.js";
+import { additionalSeedWords } from "./additional-seed-words.js";
 
 export const seedWords: SeedWord[] = [
   {
@@ -841,4 +842,5 @@ export const seedWords: SeedWord[] = [
     category: "idiom",
     notes: "Literally: to talk around the hot porridge.",
   },
+  ...additionalSeedWords,
 ];

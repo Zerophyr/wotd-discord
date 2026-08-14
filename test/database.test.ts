@@ -19,19 +19,20 @@ afterEach(() => {
 describe("WordDatabase", () => {
   it("seeds the curated vocabulary", () => {
     database = new WordDatabase(":memory:");
-    assert.equal(database.totalCount(), 70);
-    assert.equal(database.remainingCount(), 70);
+    assert.equal(database.totalCount(), 140);
+    assert.equal(database.remainingCount(), 140);
   });
 
-  it("keeps ten unique words in every rotation category", () => {
-    assert.equal(seedWords.length, 70);
-    assert.equal(new Set(seedWords.map(({ word }) => word.toLocaleLowerCase("de"))).size, 70);
+  it("keeps twenty unique words in every rotation category", () => {
+    assert.equal(seedWords.length, 140);
+    const normalizedWords = seedWords.map(({ word }) => word.trim().normalize("NFC").toLocaleLowerCase("de"));
+    assert.equal(new Set(normalizedWords).size, 140);
 
     for (const category of wordCategories) {
       assert.equal(
         seedWords.filter((word) => word.category === category).length,
-        10,
-        `Expected 10 words in ${category}`,
+        20,
+        `Expected 20 words in ${category}`,
       );
     }
   });
@@ -52,7 +53,7 @@ describe("WordDatabase", () => {
     assert.equal(database.hasPostForDate("channel-1", "2026-07-20"), true);
     assert.equal(database.getPostForDate("channel-1", "2026-07-20")?.word.id, first.id);
     assert.notEqual(database.getNextWord("everyday")?.id, first.id);
-    assert.equal(database.remainingCount(), 69);
+    assert.equal(database.remainingCount(), 139);
   });
 
   it("resets only WOTD history and suppresses automatic posting for that day", () => {
@@ -63,7 +64,7 @@ describe("WordDatabase", () => {
     database.putDictionaryMiss("missing", "missing", new Date("2026-07-20T08:00:00.000Z"));
 
     assert.equal(database.resetWotdHistory("2026-07-20"), 1);
-    assert.equal(database.remainingCount(), 70);
+    assert.equal(database.remainingCount(), 140);
     assert.equal(database.hasPostForDate("channel-1", "2026-07-20"), false);
     assert.equal(database.isAutomaticPostingSuppressed("2026-07-20"), true);
     assert.equal(database.isAutomaticPostingSuppressed("2026-07-21"), false);
@@ -74,6 +75,23 @@ describe("WordDatabase", () => {
 
     database.recordPost(first.id, "channel-1", "2026-07-20", "2026-07-20T08:05:00.000Z");
     assert.equal(database.isAutomaticPostingSuppressed("2026-07-20"), false);
+  });
+
+  it("restarts a rotation only after every active word has been posted", () => {
+    database = new WordDatabase(":memory:");
+    assert.equal(database.restartCompletedRotation(), false);
+
+    for (let index = 0; index < seedWords.length; index += 1) {
+      const word = database.getNextWord("everyday");
+      assert.ok(word);
+      database.recordPost(word.id, "channel-1", `completed-${index}`);
+    }
+
+    assert.equal(database.remainingCount(), 0);
+    assert.equal(database.restartCompletedRotation(), true);
+    assert.equal(database.remainingCount(), 140);
+    assert.equal(database.getNextWord("everyday")?.word, "Feierabend");
+    assert.equal(database.restartCompletedRotation(), false);
   });
 
   it("discards outdated and corrupt cached dictionary JSON", () => {

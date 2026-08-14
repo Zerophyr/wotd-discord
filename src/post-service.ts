@@ -33,7 +33,11 @@ export class WordPostService {
       const existing = this.database.getPostForDate(this.config.channelId, local.date);
       if (existing) return { status: "already-posted", word: existing.word };
 
-      const word = this.database.getNextWord(categoryForWeekday(local.weekday));
+      let word = this.database.getNextWord(categoryForWeekday(local.weekday));
+      if (!word && this.database.restartCompletedRotation()) {
+        console.log("All active Word-of-the-Day entries have been posted. Starting a new rotation.");
+        word = this.database.getNextWord(categoryForWeekday(local.weekday));
+      }
       if (!word) return { status: "exhausted" };
 
       const channel = await this.client.channels.fetch(this.config.channelId);

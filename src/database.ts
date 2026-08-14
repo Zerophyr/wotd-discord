@@ -210,6 +210,14 @@ export class WordDatabase {
     })();
   }
 
+  restartCompletedRotation(): boolean {
+    return this.#db.transaction(() => {
+      if (this.totalCount() === 0 || this.remainingCount() > 0) return false;
+      this.#db.prepare("DELETE FROM post_history").run();
+      return true;
+    })();
+  }
+
   isAutomaticPostingSuppressed(localDate: string): boolean {
     const row = this.#db.prepare(`
       SELECT value FROM wotd_state WHERE key = 'automatic_post_suppressed_date'
